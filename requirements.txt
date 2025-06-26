@@ -1,0 +1,16 @@
+streamlit
+openai
+requests
+sounddevice
+scipy
+numpy
+matplotlib
+scikit-learn
+google-generativeai
+streamlit-extras
+python-dotenv
+murf
+PyPDF2
+python-docx
+pytesseract
+pillow
