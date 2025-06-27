@@ -1,7 +1,6 @@
 # --- Imports ---
 import os
 import json
-import tempfile
 from datetime import datetime
 import openai
 import streamlit as st
@@ -11,6 +10,9 @@ import pytesseract
 import PyPDF2
 import docx
 from murf_integration import get_murf_api
+import moviepy as mpy  # type: ignore
+import tempfile
+
 
 # --- Environment & Configuration ---
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -19,10 +21,10 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 USER_DB = "users.json"
 INTERVIEW_DB = "interviews.json"
 COMPANIES = [
-    "Google", "Microsoft", "Amazon", "OpenAI", "Meta", "Apple", "StartupX", "Your Own Startup"
+    "Google", "Microsoft", "Amazon", "OpenAI", "Meta", "Apple", "StartupX", "Your Own Startup",
 ]
 JOB_TITLES = [
-    "Software Engineer", "Data Scientist", "Product Manager", "UX Designer", "AI Researcher"
+    "Software Engineer", "Data Scientist", "Product Manager", "UX Designer", "AI Researcher", "Hotel Manager"
 ]
 QUESTION_TYPES = {
     "MCQ": "Multiple-choice questions with 4 options and the correct answer.",
@@ -33,7 +35,8 @@ SUBJECTS = {
     "DSA": ["Arrays", "Linked Lists", "Trees", "Graphs", "Sorting", "Searching", "Dynamic Programming", "Stacks & Queues"],
     "OS": ["Processes", "Threads", "Memory Management", "Scheduling", "Synchronization", "Deadlocks"],
     "OOPs": ["Classes & Objects", "Inheritance", "Polymorphism", "Encapsulation", "Abstraction", "Design Patterns"],
-    "System Design": ["Scalability", "Databases", "APIs", "Microservices", "Caching", "Load Balancing"]
+    "System Design": ["Scalability", "Databases", "APIs", "Microservices", "Caching", "Load Balancing"],
+    "AI/ML": ["Machine Learning", "Deep Learning", "Natural Language Processing", "Computer Vision"]
 }
 
 # --- Ensure DB Files Exist ---
@@ -245,98 +248,418 @@ def render_feature_cards(feature_rows):
                 st.rerun()
 
 # --- UI Page Functions ---
+# --- Custom CSS for Modern Card UI ---
+st.markdown("""
+    <style>
+    body, .stApp {
+        /* Modern, soft blue-violet gradient background */
+        background: linear-gradient(135deg, #e0e7fa 0%, #f5e6ff 40%, #d1e7ff 100%) !important;
+        min-height: 100vh;
+    }
+    .login-card, .signup-card {
+        background: linear-gradient(135deg, #fffde4 0%, #e1f5fe 100%);
+        border-radius: 22px;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+        padding: 2.5rem 2rem 2rem 2rem;
+        max-width: 370px;
+        margin: 2.5rem auto 1.5rem auto;
+        position: relative;
+    }
+    .login-card:before, .signup-card:before {
+        content: "";
+        position: absolute;
+        top: -40px; left: -40px;
+        width: 80px; height: 80px;
+        background: rgba(200, 230, 201, 0.18);
+        border-radius: 50%;
+        z-index: 0;
+    }
+    .login-card:after, .signup-card:after {
+        content: "";
+        position: absolute;
+        top: -30px; right: -30px;
+        width: 60px; height: 60px;
+        background: rgba(224, 247, 250, 0.15);
+        border-radius: 50%;
+        z-index: 0;
+    }
+    .login-card h2, .signup-card h2 {
+        text-align: center;
+        margin-bottom: 1.5rem;
+        font-weight: 700;
+        color: #333;
+        z-index: 1;
+        position: relative;
+    }
+    .login-btn, .signup-btn {
+        background: linear-gradient(90deg, #ffb347 0%, #ffcc33 100%);
+        color: #222;
+        border: none;
+        border-radius: 8px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        width: 100%;
+        padding: 0.7rem 0;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        box-shadow: 0 2px 8px rgba(255, 180, 80, 0.15);
+        transition: background 0.2s;
+    }
+    .login-btn:hover, .signup-btn:hover {
+        background: linear-gradient(90deg, #ffcc33 0%, #ffb347 100%);
+        color: #111;
+    }
+    .stTextInput>div>div>input, .stTextInput>div>div>textarea {
+        background: #f8fafc !important;
+        border-radius: 7px !important;
+        border: 1.5px solid #b2dfdb !important;
+        font-size: 1rem !important;
+        padding: 0.6rem 0.8rem !important;
+    }
+    .stCheckbox>label {
+        font-size: 1rem !important;
+        color: #444 !important;
+    }
+    .stApp {
+        min-height: 100vh;
+    }
+    /* Blue-violet app bar at the top */
+    .appbar-title {
+        width: 420px;
+        max-width: 90vw;
+        margin: 32px auto 0px auto; /* Remove extra space below the app bar */
+        padding: 1.1rem 0.5rem;
+        background: linear-gradient(90deg, #7f9cf5 0%, #a18ff5 100%);
+        border-radius: 32px;
+        box-shadow: 0 4px 24px 0 rgba(127, 156, 245, 0.18);
+        text-align: center;
+        font-size: 2.1rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: 1px;
+        position: relative;
+        z-index: 10;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
+    }
+    @media (max-width: 600px) {
+        .appbar-title { font-size: 1.2rem; padding: 0.7rem 0.2rem; }
+        .login-card, .signup-card { padding: 1.2rem 0.5rem 1rem 0.5rem; }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- AppBar with App Name ---
+st.markdown('<div class="appbar-title">🧑‍💼 AI Interview Expert</div>', unsafe_allow_html=True)
+
+# Remove/hide the empty container below the app bar on the login page (including its height/space)
+if st.session_state.get("page", "login") == "login":
+    st.markdown(
+        """
+        <style>
+        /* Hide any empty div directly after the appbar-title and remove its space */
+        .appbar-title + div:empty {
+            display: none !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def login_page():
-    with st.sidebar:
-        # Updated image to a reliable Unsplash interview candidate photo
-        st.image("https://images.unsplash.com/photo-1521737852567-6949f3f9f2b5?auto=format&fit=crop&w=400&q=80", width=100)
-        st.markdown(
-            """
-            <div style='font-size: 1.1rem; margin-top: 1em; color:#222831;'>
-                Welcome! This app uses advanced AI to generate realistic interview questions, analyze your answers, and provide instant, personalized feedback. Practice technical, HR, and resume rounds in a smart, interactive environment.<br><br>
-                <b style='color:#0077b6;'>Instructions:</b><br>
-                <span style='color:#0077b6;'>Log in or sign up to unlock your AI-powered interview preparation journey!</span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    st.markdown("<h1 style='text-align:center;'>🧑‍💼 AI Interview Trainer</h1>", unsafe_allow_html=True)
-    add_vertical_space(2)
-    st.markdown("#### 🔐 Login to your account")
+    # Centered card layout for login
+    st.markdown('<div class="login-card">', unsafe_allow_html=True)
+    st.markdown('<h2>Login</h2>', unsafe_allow_html=True)
     login_method = st.radio("Login with:", ["Username", "Email"], horizontal=True)
+    # --- Fix label and variable for username/email ---
     if login_method == "Username":
-        login_input = st.text_input("👤 Username")
+        login_input = st.text_input("Username", key="login_username")
+        login_key = "username"
     else:
-        login_input = st.text_input("📧 Email")
-    password = st.text_input("🔑 Password", type="password")
-    col1, col2 = st.columns(2)
+        login_input = st.text_input("Email", key="login_email")
+        login_key = "email"
+    password = st.text_input("Password", type="password", key="login_password")
+    remember = st.checkbox("Remember me", key="login_remember")
+    col1, col2 = st.columns([2, 2])
     with col1:
-        if st.button("Login", use_container_width=True):
-            username = login_input.strip()
+        login_clicked = st.button("Login", key="login_btn", use_container_width=True)
+    with col2:
+        signup_clicked = st.button("Sign Up", key="goto_signup_btn", use_container_width=True)
+    if login_clicked:
+        username = login_input.strip()
+        # --- Only allow username login (since register uses username as key) ---
+        if login_method == "Username":
             if authenticate(username, password):
                 st.session_state.logged_in = True
                 st.session_state.username = username
-                st.session_state.page = "dashboard"  # Redirect to dashboard after login
+                st.session_state.page = "dashboard"
                 st.rerun()
             else:
                 st.error("Invalid credentials")
-    with col2:
-        if st.button("Sign Up", use_container_width=True):
-            st.session_state.page = "signup"
-            st.rerun()
-    # Add back button to login page (goes to dashboard if logged in, else does nothing)
-    if st.session_state.get("logged_in"):
-        back_to_dashboard_button("login", target_page="dashboard")
+        else:
+            st.error("Login with Email is not supported. Please use Username.")
+    if signup_clicked:
+        st.session_state.page = "signup"
+        st.rerun()
+    st.markdown('<div style="text-align:center; margin-top:1rem;">Don\'t have an account? <span style="color:#ff9800; font-weight:600;">Sign Up</span></div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def signup_page():
-    st.markdown("<h1 style='text-align:center;'>📝 Sign Up</h1>", unsafe_allow_html=True)
-    add_vertical_space(2)
-    username = st.text_input("👤 New Username")
-    password = st.text_input("🔑 New Password", type="password")
-    col1, col2 = st.columns(2)
+    # Centered card layout for signup
+    st.markdown('<div class="signup-card">', unsafe_allow_html=True)
+    st.markdown('<h2>Create an account</h2>', unsafe_allow_html=True)
+    username = st.text_input("Username", key="signup_username")
+    # Remove email field since login/register is username-based
+    password = st.text_input("Password", type="password", key="signup_password")
+    confirm_password = st.text_input("Confirm Password", type="password", key="signup_confirm_password")
+    remember = st.checkbox("Remember me", key="signup_remember")
+    col1, col2 = st.columns([2, 2])
     with col1:
-        if st.button("Register", use_container_width=True):
-            if register(username, password):
-                st.success("Registered! Please log in.")
-                st.session_state.page = "login"
-            else:
-                st.error("Username exists")
+        signup_clicked = st.button("Sign Up", key="signup_btn", use_container_width=True)
     with col2:
-        if st.button("Back to Login", use_container_width=True):
+        login_clicked = st.button("Login", key="goto_login_btn", use_container_width=True)
+    if signup_clicked:
+        if password != confirm_password:
+            st.error("Passwords do not match.")
+        elif not username or not password:
+            st.error("Please fill all fields.")
+        elif register(username, password):
+            st.success("Registered! Please log in.")
             st.session_state.page = "login"
-            st.rerun()
-    # Add back button to signup page
-    back_to_dashboard_button("signup", target_page="login")
+        else:
+            st.error("Username exists")
+    if login_clicked:
+        st.session_state.page = "login"
+        st.rerun()
+    st.markdown('<div style="text-align:center; margin-top:1rem;">Already have an account? <span style="color:#ff9800; font-weight:600;">Login</span></div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def dashboard_page():
-    st.markdown("<h2 style='text-align:center;'>🏠 Dashboard</h2>", unsafe_allow_html=True)
-    st.write(f"Welcome, **{st.session_state.get('username', 'User')}**!")
-    st.write("Select a feature to begin:")
-    # Arrange features in the requested order and center them in a single row
-    features = [[
-        {"icon": "🎯", "title": "Tech Interview", "desc": "Practice technical interviews.", "color": "#34A853", "page": "interview"},
-        {"icon": "👨‍🏫", "title": "AI Teacher", "desc": "Get AI-powered explanations and tutoring.", "color": "#F9A825", "page": "ai_teacher"},
-        {"icon": "🗣️", "title": "HR Chat", "desc": "Practice HR interview questions.", "color": "#4F8BF9", "page": "communication"},
-        {"icon": "📄", "title": "Resume Analyzer", "desc": "Analyze and improve your resume.", "color": "#8E24AA", "page": "resume_analyzer"},
-        {"icon": "🔊", "title": "Voice Settings", "desc": "Configure your voice and audio preferences.", "color": "#00ACC1", "page": "voice_settings"}
-    ]]
-    # Center the feature cards row
-    st.markdown("""
+    # Ensure Streamlit renders the dashboard content
+    st.write(f"Welcome, **{st.session_state.get('username', 'User')}**! 👋")
+
+    # --- Dashboard Stats Cards (top row, minimized and equal size) ---
+    stats = [
+        {
+            "label": "Interviews Attempted",
+            "value": len(get_history(st.session_state.get('username', ''))),
+            "icon": "📝",
+            "desc": "Total interview sessions you've attempted."
+        },
+        {
+            "label": "Topics Learned",
+            "value": 0,  # You can update this with your logic
+            "icon": "📚",
+            "desc": "Topics you have learned or practiced."
+        },
+        {
+            "label": "History",
+            "value": "",  # No count, just a link/button
+            "icon": "🕑",
+            "desc": "View your interview history."
+        }
+    ]
+    # Use equal and minimal width columns for all three cards
+    stat_cols = st.columns([1, 1, 1])
+    card_css = """
         <style>
-        .feature-card-row { display: flex; justify-content: center; align-items: center; }
+        .mini-stat-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(127,156,245,0.07);
+            padding: 0.7rem 0.5rem 0.7rem 0.5rem;
+            margin-bottom: 8px;
+            text-align: center;
+            min-width: 120px;
+            max-width: 180px;
+            width: 100%;
+            display: inline-block;
+        }
+        .mini-stat-card .stat-icon {
+            font-size: 1.5rem;
+        }
+        .mini-stat-card .stat-label {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #7f9cf5;
+        }
+        .mini-stat-card .stat-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .mini-stat-card .stat-desc {
+            font-size: 0.85rem;
+            color: #888;
+        }
         </style>
-    """, unsafe_allow_html=True)
-    render_feature_cards(features)
+    """
+    st.markdown(card_css, unsafe_allow_html=True)
+    for i, stat in enumerate(stats):
+        with stat_cols[i]:
+            st.markdown(
+                f"""
+                <div class="mini-stat-card">
+                    <div class="stat-icon">{stat['icon']}</div>
+                    <div class="stat-label">{stat['label']}</div>
+                    <div class="stat-value">{stat['value']}</div>
+                    <div class="stat-desc">{stat['desc']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    # Add a "View History" button in the third card
+    with stat_cols[2]:
+        if st.button("View History", key="view_history_btn", use_container_width=True):
+            st.session_state.page = "history"
+            st.rerun()
+
+    # --- Voice Settings Card (centered, similar to screenshot) ---
+    st.markdown(
+        """
+        <div style="background: #f7f8fd; border-radius: 14px; box-shadow: 0 1px 4px rgba(127,156,245,0.06); padding: 1.1rem 1rem 1.1rem 1rem; margin: 0.5rem auto 1.2rem auto; max-width: 600px;">
+            <b>Voice Settings</b><br>
+            <span style="font-size:0.98rem; color:#555;">
+                Personalize your experience by choosing your preferred voice for each feature.
+            </span>
+            <span style="float:right;">
+                <a href="#" onclick="window.location.hash='voice_settings';window.location.reload();" style="color:#7f9cf5;font-weight:600;text-decoration:none;">
+                    Customize Voices
+                </a>
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # --- Feature Cards (replace with your app features) ---
+    features = [
+        {
+            "icon": "🎯",
+            "title": "Tech Interview",
+            "desc": "Practice technical interviews.",
+            "color": "#7f9cf5",
+            "page": "interview"
+        },
+        {
+            "icon": "👨‍🏫",
+            "title": "AI Teacher",
+            "desc": "Get AI-powered explanations and tutoring.",
+            "color": "#a18ff5",
+            "page": "ai_teacher"
+        },
+        {
+            "icon": "🗣️",
+            "title": "HR Chat",
+            "desc": "Practice HR interview questions.",
+            "color": "#4F8BF9",
+            "page": "communication"
+        },
+        {
+            "icon": "📄",
+            "title": "Resume Analyzer",
+            "desc": "Analyze and improve your resume.",
+            "color": "#8E24AA",
+            "page": "resume_analyzer"
+        },
+        {
+    "icon": "🎬",
+    "title": "Video Summary",
+    "desc": "Watch a video summary of your interview journey.",
+    "color": "#ff9800",
+    "page": "video_summary"
+}
+    ]
+    # Arrange features in two rows, 3 + 2
+    feature_rows = [features[:3], features[3:]]
+    for row in feature_rows:
+        cols = st.columns(len(row))
+        for i, feat in enumerate(row):
+            with cols[i]:
+                st.markdown(
+                    f"""
+                    <div class='feature-card' style='border-top: 4px solid {feat['color']}; margin-bottom: 18px;'>
+                        <span class='stat-icon' style='color:{feat['color']};font-size:2.1rem;'>{feat['icon']}</span>
+                        <div class='feature-title' style="font-weight:600;font-size:1.1rem;">{feat['title']}</div>
+                        <div class='feature-desc' style="font-size:0.97rem;color:#555;">{feat['desc']}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                if st.button(f"{feat['title']}", key=f"cardbtn_{feat['title']}", use_container_width=True):
+                    st.session_state.page = feat['page']
+                    st.rerun()
+
     if st.button("Logout", key="logout_btn", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.page = "login"
         st.rerun()
 
+def video_summary_page():
+    st.markdown("<h2 style='text-align:center;'>🎬 Video Summary</h2>", unsafe_allow_html=True)
+    st.info("Watch a video summary of your interview journey: Tech Interview, HR Chat, and Resume Analyzer.")
+
+    username = st.session_state.get('username', 'User')
+    interview_count = len(get_history(username))
+    hr_count = interview_count
+    resume_count = 1 if st.session_state.get("ats_json") else 0
+
+    texts = [
+        f"AI Interview Summary for {username}",
+        f"Tech Interviews Attempted: {interview_count}",
+        f"HR Chats Completed: {hr_count}",
+        f"Resumes Analyzed: {resume_count}",
+        "Keep practicing and improving!"
+    ]
+
+    clips = []
+    for txt in texts:
+        clip = mpy.TextClip(txt, color='white', bg_color='#7f9cf5', size=(720, 480), method='caption', font='Arial', fontsize=48).set_duration(2)
+        clips.append(clip)
+
+    video = mpy.concatenate_videoclips(clips, method="compose")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmpfile:
+        video.write_videofile(tmpfile.name, fps=24, codec="libx264", audio=False, verbose=False, logger=None)
+        st.video(tmpfile.name)
+
+    st.markdown("This is an auto-generated video summary of your interview journey.")
+    back_to_dashboard_button("video_summary", target_page="dashboard")
+
 def ai_teacher_page():
     st.markdown("<h2 style='text-align:center;'>👨‍🏫 AI Teacher</h2>", unsafe_allow_html=True)
     st.info("Ask any technical question and get an AI-powered explanation.")
+
+    # Use a local variable for question input, do not set st.session_state["ai_teacher_q"] directly
     question = st.text_area("Enter your technical question:", key="ai_teacher_q")
     explanation = st.session_state.get("ai_teacher_explanation", "")
-    if st.button("Get Explanation", key="ai_teacher_btn", use_container_width=True):
+
+    # Minimize the size of Get Explanation, Next, and Back buttons
+    btn_css = """
+        <style>
+        .min-btn button, .min-btn-back button {
+            min-width: 120px !important;
+            min-height: 38px !important;
+            font-size: 1rem !important;
+            padding: 2px 10px !important;
+            border-radius: 7px !important;
+        }
+        </style>
+    """
+    st.markdown(btn_css, unsafe_allow_html=True)
+
+    btn_col1, btn_col2, btn_col3 = st.columns([2,1,2])
+    with btn_col2:
+        get_exp_clicked = st.button("Explain", key="ai_teacher_btn", use_container_width=True, help="Get AI explanation", type="primary")
+    next_clicked = False
+    next_col1, next_col2, next_col3 = st.columns([3,1,3])
+    with next_col2:
+        next_clicked = st.button("Next", key="ai_teacher_next_btn", use_container_width=True, help="Next question", type="secondary")
+
+    if get_exp_clicked:
         if not question.strip():
             st.warning("Please enter a question.")
         else:
@@ -350,33 +673,57 @@ def ai_teacher_page():
                 try:
                     response = model.generate_content(prompt)
                     explanation = response.text.strip()
-                    st.session_state["ai_teacher_explanation"] = explanation
-                    st.success("AI Explanation:")
-                    st.write(explanation)
+                    # Minimize feedback length (first 3 sentences or 350 chars)
+                    import re
+                    sentences = re.split(r'(?<=[.!?])\s+', explanation)
+                    short_explanation = ""
+                    char_limit = 900
+                    for sent in sentences:
+                        if len(short_explanation) + len(sent) > char_limit:
+                            break
+                        short_explanation += sent + " "
+                        if short_explanation.count('.') >= 3:
+                            break
+                    short_explanation = short_explanation.strip()
+                    st.session_state["ai_teacher_explanation"] = short_explanation if short_explanation else explanation
                 except Exception as e:
                     st.error(f"Error from Gemini API: {e}")
-    # Show explanation if available
+
+    # Next button clears the explanation and question for a new input
+    if next_clicked:
+        st.session_state["ai_teacher_explanation"] = ""
+        # Do NOT set st.session_state["ai_teacher_q"] here, just rerun to clear explanation
+        st.experimental_rerun()
+
     if st.session_state.get("ai_teacher_explanation"):
         st.success("AI Explanation:")
         st.write(st.session_state["ai_teacher_explanation"])
         # --- Audio button for AI Teacher answer ---
         audio_col1, audio_col2, audio_col3 = st.columns([3,2,3])
         with audio_col2:
-            if st.button("🔊 Listen to AI Explanation", key="ai_teacher_audio_btn", use_container_width=True):
+            st.markdown("""
+                <style>
+                div[data-testid="stHorizontalBlock"] button[title="View fullscreen"] {
+                    display: none !important;
+                }
+                div[data-testid="stHorizontalBlock"] div[role="button"] + div[role="button"] {
+                    display: none !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            if st.button("🔊 Voice", key="ai_teacher_audio_btn", use_container_width=True):
                 voice_id = st.session_state.get("selected_voice", "en-US-terrell")
                 murf = get_murf_api()
                 if murf:
                     audio_bytes = murf_tts(st.session_state["ai_teacher_explanation"], voice_id)
                     if audio_bytes:
-                        audio_player_col1, audio_player_col2, audio_player_col3 = st.columns([3,2,3])
-                        with audio_player_col2:
-                            st.audio(audio_bytes, format="audio/mp3")
+                        st.audio(audio_bytes, format="audio/mp3")
                     else:
                         st.warning("Could not generate audio. Check Murf API key and voice settings.")
                 else:
                     st.warning("Murf API is not available. Please check your Murf API key in the sidebar.")
-    back_to_dashboard_button("ai_teacher", target_page="dashboard")
 
+# --- Resume Analyzer Page ---
 def resume_analyzer_page():
     st.markdown("<h2 style='text-align:center;'>📄 Resume Analyzer</h2>", unsafe_allow_html=True)
     st.info("Upload your resume (PDF, DOCX, TXT, or PNG image) to get AI-powered feedback.")
@@ -528,6 +875,7 @@ Resume Text:
         back_col1, back_col2, back_col3 = st.columns([3,2,3])
         with back_col2:
             back_to_dashboard_button("resume_analyzer", target_page="dashboard")
+
 def voice_settings_page():
     st.markdown("<h2 style='text-align:center;'>🔊 Voice Settings</h2>", unsafe_allow_html=True)
     st.info("Select your preferred voice for audio features.")
@@ -833,7 +1181,7 @@ def communication_page():
 
     # Start HR round button (if not active)
     if not st.session_state.hr_chat_active:
-        start_col1, start_col2, start_col3 = st.columns([2,2,2])
+        start_col1, start_col2 = st.columns([2, 2])
         with start_col2:
             if st.button("Start HR Round", key="hr_start_btn", use_container_width=True):
                 st.session_state.hr_chat_active = True
@@ -1013,6 +1361,8 @@ elif st.session_state.page == "resume_analyzer":
     resume_analyzer_page()
 elif st.session_state.page == "voice_settings":
     voice_settings_page()
+elif st.session_state.page == "video_summary":
+    video_summary_page()
 else:
     # Fallback: If page is not recognized, redirect to dashboard
     st.session_state.page = "dashboard"
