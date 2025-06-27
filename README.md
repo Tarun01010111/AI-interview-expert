@@ -46,7 +46,10 @@ Welcome to **AI Interview Trainer** – your all-in-one, AI-powered platform for
 
 ### 5. 🔊 **Voice Settings**
 - Choose your preferred voice (Male/Female) for all audio features.
-
+ 
+ ### 6. 🎬 **Video Summary**
+- Instantly generate and watch a video summary of your entire interview journey (Tech Interview, HR Chat, Resume Analyzer) using MoviePy.
+- Visualize your progress and performance in a short, auto-generated video.
 ---
 
 ## 🛠️ Tools and Technologies Used
