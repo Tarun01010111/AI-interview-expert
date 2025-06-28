@@ -1,12 +1,12 @@
-# 🧑‍💼 AI Interview Trainer
+# 🧑‍💼 AI Interview   Expert
 
-Welcome to **AI Interview Trainer** – your all-in-one, AI-powered platform for mastering technical, HR, and resume interviews with instant feedback and voice support.
+Welcome to **AI Interview Expert** – your all-in-one, AI-powered platform for mastering technical, HR, and resume interviews with instant feedback and voice support.
 
 ---
 
-## 🎯 What is AI Interview Trainer?
+## 🎯 What is AI Interview Expert?
 
-**AI Interview Trainer** is a Streamlit-based web application designed for **students**, **job seekers**, and **professionals** who want to practice and improve their interview skills. It offers realistic technical and HR interview simulations, resume analysis, and AI-powered explanations — all with optional voice feedback.
+**AI Interview Expert** is a Streamlit-based web application designed for **students**, **job seekers**, and **professionals** who want to practice and improve their interview skills. It offers realistic technical and HR interview simulations, resume analysis, and AI-powered explanations — all with optional voice feedback.
 
 ---
 
@@ -24,7 +24,7 @@ Welcome to **AI Interview Trainer** – your all-in-one, AI-powered platform for
 
 ---
 
-## 🧠 What Can AI Interview Trainer Do?
+## 🧠 What Can AI Interview Expert Do?
 
 ### 1. 🎯 **Tech Interview**
 - Practice MCQ, theoretical, and practical questions for top companies and roles.

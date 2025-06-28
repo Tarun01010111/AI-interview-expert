@@ -193,18 +193,28 @@ def murf_tts(text, voice_id=None):
             text = truncated
         audio_data = murf.text_to_speech(text, voice_id)
         if audio_data:
-            if isinstance(audio_data, str):
+            # --- Fix: Always return bytes for st.audio ---
+            if isinstance(audio_data, bytes):
+                return audio_data
+            elif isinstance(audio_data, str):
                 if audio_data.startswith("http"):
                     import requests
                     audio_bytes = requests.get(audio_data).content
+                    return audio_bytes
                 elif os.path.exists(audio_data):
                     with open(audio_data, "rb") as f:
                         audio_bytes = f.read()
+                    return audio_bytes
                 else:
-                    audio_bytes = audio_data.encode("utf-8")
+                    # If it's a base64 string or other, decode if possible
+                    try:
+                        import base64
+                        audio_bytes = base64.b64decode(audio_data)
+                        return audio_bytes
+                    except Exception:
+                        return audio_data.encode("utf-8")
             else:
-                audio_bytes = audio_data
-            return audio_bytes
+                return bytes(audio_data)
         return None
     except Exception as e:
         return None
@@ -251,19 +261,67 @@ def render_feature_cards(feature_rows):
 # --- Custom CSS for Modern Card UI ---
 st.markdown("""
     <style>
-    body, .stApp {
-        /* Modern, soft blue-violet gradient background */
+    /* Force light mode for all Streamlit elements and backgrounds */
+    html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stSidebar"] {
         background: linear-gradient(135deg, #e0e7fa 0%, #f5e6ff 40%, #d1e7ff 100%) !important;
-        min-height: 100vh;
+        color-scheme: light !important;
+        color: #222 !important;
     }
-    .login-card, .signup-card {
-        background: linear-gradient(135deg, #fffde4 0%, #e1f5fe 100%);
-        border-radius: 22px;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
-        padding: 2.5rem 2rem 2rem 2rem;
-        max-width: 370px;
-        margin: 2.5rem auto 1.5rem auto;
+    html[data-theme="dark"], body[data-theme="dark"], .stApp[data-theme="dark"] {
+        background: linear-gradient(135deg, #e0e7fa 0%, #f5e6ff 40%, #d1e7ff 100%) !important;
+        color-scheme: light !important;
+        color: #222 !important;
+    }
+    /
+    .login-card *, .signup-card * {
+        color: #222 !important;
+        font-weight: 500;
+    }
+    /* Make radio and checkbox labels readable */
+    .stRadio label, .stCheckbox label {
+        color: #222 !important;
+        font-weight: 600 !important;
+    }
+    /* Make text input and textarea backgrounds always light */
+    .stTextInput input, .stTextArea textarea {
+        background: #f8fafc !important;
+        color: #222 !important;
+        border-radius: 7px !important;
+        border: 1.5px solid #b2dfdb !important;
+        font-size: 1rem !important;
+        padding: 0.6rem 0.8rem !important;
+    }
+    .stTextInput input:focus, .stTextArea textarea:focus {
+        background: #fff !important;
+        color: #222 !important;
+    }
+    /* Placeholder text readable */
+    .stTextInput input::placeholder, .stTextArea textarea::placeholder {
+        color: #888 !important;
+        opacity: 1 !important;
+    }
+    /* Autofill fix for Chrome */
+    input:-webkit-autofill, textarea:-webkit-autofill {
+        -webkit-box-shadow: 0 0 0 1000px #f8fafc inset !important;
+        -webkit-text-fill-color: #222 !important;
+    }
+    /* App bar and card decorations */
+    .appbar-title {
+        width: 420px;
+        max-width: 90vw;
+        margin: 32px auto 0px auto;
+        padding: 1.1rem 0.5rem;
+        background: linear-gradient(90deg, #7f9cf5 0%, #a18ff5 100%);
+        border-radius: 32px;
+        box-shadow: 0 4px 24px 0 rgba(127, 156, 245, 0.18);
+        text-align: center;
+        font-size: 2.1rem;
+        font-weight: 700;
+        color: #fff;
+        letter-spacing: 1px;
         position: relative;
+        z-index: 10;
+        font-family: 'Segoe UI', 'Arial', sans-serif;
     }
     .login-card:before, .signup-card:before {
         content: "";
@@ -293,28 +351,21 @@ st.markdown("""
     }
     .login-btn, .signup-btn {
         background: linear-gradient(90deg, #ffb347 0%, #ffcc33 100%);
-        color: #222;
+        color: #fff !important;  /* Changed from #222 to white */
         border: none;
         border-radius: 8px;
         font-size: 1.1rem;
-        font-weight: 600;
-        width: 100%;
+        font-weight: 500;
+        width: 30%;
         padding: 0.7rem 0;
-        margin-top: 1rem;
-        margin-bottom: 0.5rem;
+        margin-top: 2rem;
+        margin-bottom: 0.3rem;
         box-shadow: 0 2px 8px rgba(255, 180, 80, 0.15);
         transition: background 0.2s;
     }
     .login-btn:hover, .signup-btn:hover {
         background: linear-gradient(90deg, #ffcc33 0%, #ffb347 100%);
-        color: #111;
-    }
-    .stTextInput>div>div>input, .stTextInput>div>div>textarea {
-        background: #f8fafc !important;
-        border-radius: 7px !important;
-        border: 1.5px solid #b2dfdb !important;
-        font-size: 1rem !important;
-        padding: 0.6rem 0.8rem !important;
+        color: #fff !important;  /* Changed from #111 to white */
     }
     .stCheckbox>label {
         font-size: 1rem !important;
@@ -323,32 +374,73 @@ st.markdown("""
     .stApp {
         min-height: 100vh;
     }
-    /* Blue-violet app bar at the top */
-    .appbar-title {
-        width: 420px;
-        max-width: 90vw;
-        margin: 32px auto 0px auto; /* Remove extra space below the app bar */
-        padding: 1.1rem 0.5rem;
-        background: linear-gradient(90deg, #7f9cf5 0%, #a18ff5 100%);
-        border-radius: 32px;
-        box-shadow: 0 4px 24px 0 rgba(127, 156, 245, 0.18);
-        text-align: center;
-        font-size: 2.1rem;
-        font-weight: 700;
-        color: #fff;
-        letter-spacing: 1px;
-        position: relative;
-        z-index: 10;
-        font-family: 'Segoe UI', 'Arial', sans-serif;
-    }
     @media (max-width: 600px) {
         .appbar-title { font-size: 1.2rem; padding: 0.7rem 0.2rem; }
         .login-card, .signup-card { padding: 1.2rem 0.5rem 1rem 0.5rem; }
+    }
+    /* --- Custom styles for modern card UI --- */
+    .mini-stat-card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(127,156,245,0.07);
+        padding: 0.7rem 0.5rem 0.7rem 0.5rem;
+        margin-bottom: 8px;
+        text-align: center;
+        min-width: 120px;
+        max-width: none;  # Remove max-width restriction
+        width: 100%;
+        display: block;   # Make card expand to full column width
+    }
+    .mini-stat-card .stat-icon {
+        font-size: 1.5rem;
+    }
+    .mini-stat-card .stat-label {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #7f9cf5;
+    }
+    .mini-stat-card .stat-value {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #333;
+    }
+    .mini-stat-card .stat-desc {
+        font-size: 0.85rem;
+        color: #888;
+    }
+    .min-btn-history button {
+        min-width: 120px !important;
+        max-width: none !important;
+        width: 100% !important;
+        min-height: 38px !important;
+        font-size: 1rem !important;
+        padding: 0.7rem 0 !important;
+        border-radius: 12px !important;
+        font-weight: 500 !important;
+        background: #fff !important;
+        color: #222 !important;
+        border: 1.5px solid #b2dfdb !important;
+        box-shadow: 0 2px 8px rgba(127,156,245,0.07);
+        transition: background 0.2s;
+        margin-top: 0.5em;
+    }
+    .min-btn-history button:hover {
+        background: #f8fafc !important;
+        color: #111 !important;
+        border-color: #7f9cf5 !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # --- AppBar with App Name ---
+# Fix: Add margin-bottom to prevent overlap with boxes
+st.markdown('''
+    <style>
+    .appbar-title {
+        margin-bottom: 32px !important;
+    }
+    </style>
+''', unsafe_allow_html=True)
 st.markdown('<div class="appbar-title">🧑‍💼 AI Interview Expert</div>', unsafe_allow_html=True)
 
 # Remove/hide the empty container below the app bar on the login page (including its height/space)
@@ -438,9 +530,9 @@ def signup_page():
     st.markdown('</div>', unsafe_allow_html=True)
 
 def dashboard_page():
-    # Ensure Streamlit renders the dashboard content
-    st.write(f"Welcome, **{st.session_state.get('username', 'User')}**! 👋")
-
+    # Prevent dashboard from showing if not logged in
+    if not st.session_state.get("logged_in", False):
+        return
     # --- Dashboard Stats Cards (top row, minimized and equal size) ---
     stats = [
         {
@@ -462,7 +554,6 @@ def dashboard_page():
             "desc": "View your interview history."
         }
     ]
-    # Use equal and minimal width columns for all three cards
     stat_cols = st.columns([1, 1, 1])
     card_css = """
         <style>
@@ -474,9 +565,9 @@ def dashboard_page():
             margin-bottom: 8px;
             text-align: center;
             min-width: 120px;
-            max-width: 180px;
+            max-width: none;  # Remove max-width restriction
             width: 100%;
-            display: inline-block;
+            display: block;   # Make card expand to full column width
         }
         .mini-stat-card .stat-icon {
             font-size: 1.5rem;
@@ -495,6 +586,27 @@ def dashboard_page():
             font-size: 0.85rem;
             color: #888;
         }
+        .min-btn-history button {
+            min-width: 120px !important;
+            max-width: none !important;
+            width: 100% !important;
+            min-height: 38px !important;
+            font-size: 1rem !important;
+            padding: 0.7rem 0 !important;
+            border-radius: 12px !important;
+            font-weight: 500 !important;
+            background: #fff !important;
+            color: #222 !important;
+            border: 1.5px solid #b2dfdb !important;
+            box-shadow: 0 2px 8px rgba(127,156,245,0.07);
+            transition: background 0.2s;
+            margin-top: 0.5em;
+        }
+        .min-btn-history button:hover {
+            background: #f8fafc !important;
+            color: #111 !important;
+            border-color: #7f9cf5 !important;
+        }
         </style>
     """
     st.markdown(card_css, unsafe_allow_html=True)
@@ -511,123 +623,342 @@ def dashboard_page():
                 """,
                 unsafe_allow_html=True
             )
-    # Add a "View History" button in the third card
+    # --- Show History as a modal popup ---
+    if "show_history" not in st.session_state:
+        st.session_state.show_history = False
     with stat_cols[2]:
-        if st.button("View History", key="view_history_btn", use_container_width=True):
-            st.session_state.page = "history"
-            st.rerun()
-
-    # --- Voice Settings Card (centered, similar to screenshot) ---
-    st.markdown(
-        """
-        <div style="background: #f7f8fd; border-radius: 14px; box-shadow: 0 1px 4px rgba(127,156,245,0.06); padding: 1.1rem 1rem 1.1rem 1rem; margin: 0.5rem auto 1.2rem auto; max-width: 600px;">
-            <b>Voice Settings</b><br>
-            <span style="font-size:0.98rem; color:#555;">
-                Personalize your experience by choosing your preferred voice for each feature.
-            </span>
-            <span style="float:right;">
-                <a href="#" onclick="window.location.hash='voice_settings';window.location.reload();" style="color:#7f9cf5;font-weight:600;text-decoration:none;">
-                    Customize Voices
-                </a>
-            </span>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # --- Feature Cards (replace with your app features) ---
+        st.markdown('<div class="min-btn-history">',unsafe_allow_html=True)
+        if st.button("Show History", key="show_history_btn", use_container_width=True):
+            st.session_state.show_history = True
+        st.markdown('</div>', unsafe_allow_html=True)
+    if st.session_state.get("show_history", False):
+        import streamlit.components.v1 as components
+        # Modal-like effect using Streamlit's expander
+        with st.expander("Your Interview History", expanded=True):
+            username = st.session_state.get('username', '')
+            history = get_history(username)
+            if not history:
+                st.info("No interview history found.")
+            else:
+                for idx, interview in enumerate(reversed(history[-10:])):
+                    st.markdown(f"**{idx+1}. {interview.get('company', 'N/A')}** - {interview.get('job_title', 'N/A')} ({interview.get('date', 'N/A')})")
+                    st.write(f"Type: {interview.get('question_type', 'N/A')}, Difficulty: {interview.get('difficulty', 'N/A')}, Score: {interview.get('overall_score', 'N/A')}")
+                    st.write("---")
+            if st.button("Close History", key="close_history_btn"):
+                st.session_state.show_history = False
+    # --- Modern Feature Grid: 3 features per row, 2 rows, minimized buttons ---
     features = [
         {
             "icon": "🎯",
             "title": "Tech Interview",
             "desc": "Practice technical interviews.",
-            "color": "#7f9cf5",
+            "color": "#ffb6b6",
             "page": "interview"
         },
         {
             "icon": "👨‍🏫",
             "title": "AI Teacher",
             "desc": "Get AI-powered explanations and tutoring.",
-            "color": "#a18ff5",
+            "color": "#b6d0ff",
             "page": "ai_teacher"
+        },
+        {
+            "icon": "📊",
+            "title": "Resume Analyzer",
+            "desc": "Analyze and improve your resume.",
+            "color": "#ffe0b6",
+            "page": "resume_analyzer"
         },
         {
             "icon": "🗣️",
             "title": "HR Chat",
             "desc": "Practice HR interview questions.",
-            "color": "#4F8BF9",
+            "color": "#23263a",  # restore dark blue for HR Chat
             "page": "communication"
         },
         {
-            "icon": "📄",
-            "title": "Resume Analyzer",
-            "desc": "Analyze and improve your resume.",
-            "color": "#8E24AA",
-            "page": "resume_analyzer"
+            "icon": "🎬",
+            "title": "Video Summary",
+            "desc": "Watch a video summary of your interview journey.",
+            "color": "#554e9f",  # restore dark blue for Video Summary
+            "page": "video_summary"
         },
         {
-    "icon": "🎬",
-    "title": "Video Summary",
-    "desc": "Watch a video summary of your interview journey.",
-    "color": "#ff9800",
-    "page": "video_summary"
-}
+            "icon": "🔊",
+            "title": "Voice Settings",
+            "desc": "Customize your voice experience.",
+            "color": "#23393a",  # restore dark blue for Voice Settings
+            "page": "voice_settings"
+        }
     ]
-    # Arrange features in two rows, 3 + 2
-    feature_rows = [features[:3], features[3:]]
-    for row in feature_rows:
-        cols = st.columns(len(row))
-        for i, feat in enumerate(row):
+
+    st.markdown("""
+    <style>
+    .feature-card-ss {
+        width: 100%;
+        min-height: 120px;
+        border-radius: 18px;
+        box-shadow: 0 2px 16px rgba(127,156,245,0.09);
+        padding: 1.2rem 1.1rem 1.1rem 1.1rem;
+        margin: 0 0 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        cursor: pointer;
+        border: 2.5px solid transparent;
+        transition: box-shadow 0.18s, border 0.18s, background 0.18s;
+        position: relative;
+    }
+    .feature-card-ss.left {
+        background: #fff;
+        border-color: #e7eaf3;
+    }
+    .feature-card-ss.right {
+        background: #23263a;
+        border-color: #35384a;
+    }
+    .feature-card-ss .icon {
+        font-size: 2.1rem;
+        border-radius: 12px;
+        padding: 0.45em 0.7em 0.45em 0.7em;
+        margin-bottom: 0.7em;
+        display: inline-block;
+    }
+    .feature-card-ss .title {
+        font-size: 1.09rem;
+        font-weight: 700;
+        margin-bottom: 0.3em;
+        color: #23263a;
+    }
+    .feature-card-ss.right .title,
+    .feature-card-ss.right .desc {
+        color: #fff;
+    }
+    .feature-card-ss .desc {
+        font-size: 0.97rem;
+        color: #6a6a7a;
+        min-height: 32px;
+    }
+    .feature-card-ss.right .desc {
+        color: #bfc4d0;
+    }
+    .feature-card-ss:hover {
+        box-shadow: 0 8px 32px rgba(127,156,245,0.18);
+        border-color: #7f9cf5;
+        z-index: 2;
+    }
+    .min-btn button {
+        min-width: 80px !important;
+        min-height: 32px !important;
+        font-size: 0.95rem !important;
+        padding: 2px 8px !important;
+        border-radius: 7px !important;
+    }
+    .min-logout-btn button {
+        min-width: 80px !important;
+        min-height: 32px !important;
+        font-size: 0.95rem !important;
+        padding: 2px 8px !important;
+        border-radius: 7px !important;
+        background: #f3f3f3 !important;
+        color: #333 !important;
+        border: 1px solid #e0e0e0 !important;
+        margin-top: 18px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    rows = [features[:3], features[3:]]
+    for row_idx, row_feats in enumerate(rows):
+        cols = st.columns(3, gap="large")
+        for i, feat in enumerate(row_feats):
             with cols[i]:
-                st.markdown(
-                    f"""
-                    <div class='feature-card' style='border-top: 4px solid {feat['color']}; margin-bottom: 18px;'>
-                        <span class='stat-icon' style='color:{feat['color']};font-size:2.1rem;'>{feat['icon']}</span>
-                        <div class='feature-title' style="font-weight:600;font-size:1.1rem;">{feat['title']}</div>
-                        <div class='feature-desc' style="font-size:0.97rem;color:#555;">{feat['desc']}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                card_html = f"""
+                <div class="feature-card-ss {'left' if row_idx == 0 else 'right'}" style="background:{feat['color']};" onclick="window.location.hash='{feat['page']}'; window.location.reload();">
+                    <span class="icon">{feat['icon']}</span>
+                    <div class="title">{feat['title']}</div>
+                    <div class="desc">{feat['desc']}</div>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
+                st.markdown('<div class="min-btn">', unsafe_allow_html=True)
                 if st.button(f"{feat['title']}", key=f"cardbtn_{feat['title']}", use_container_width=True):
                     st.session_state.page = feat['page']
                     st.rerun()
-
+                st.markdown('</div>', unsafe_allow_html=True) 
+                
+    # Minimized logout button at the end, centered using columns [2,1,2]
+    logout_col1, logout_col2, logout_col3 = st.columns([2,1,2])
+    with logout_col2:
+        st.markdown('<div class="min-logout-btn">', unsafe_allow_html=True)
     if st.button("Logout", key="logout_btn", use_container_width=True):
         st.session_state.logged_in = False
         st.session_state.page = "login"
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def video_summary_page():
     st.markdown("<h2 style='text-align:center;'>🎬 Video Summary</h2>", unsafe_allow_html=True)
-    st.info("Watch a video summary of your interview journey: Tech Interview, HR Chat, and Resume Analyzer.")
+    ats_json = st.session_state.get("ats_json")
+    if not ats_json:
+        st.warning("No resume analysis found. Please analyze your resume first in the Resume Analyzer.")
+        return
 
-    username = st.session_state.get('username', 'User')
-    interview_count = len(get_history(username))
-    hr_count = interview_count
-    resume_count = 1 if st.session_state.get("ats_json") else 0
+    import time
 
-    texts = [
-        f"AI Interview Summary for {username}",
-        f"Tech Interviews Attempted: {interview_count}",
-        f"HR Chats Completed: {hr_count}",
-        f"Resumes Analyzed: {resume_count}",
-        "Keep practicing and improving!"
+    # --- Prepare summary points ---
+    ats_score = ats_json.get("ats_score", "N/A")
+    summary = ats_json.get("summary", "")
+    suggestions = ats_json.get("suggestions", [])
+    missing_terms = ats_json.get("missing_terms", [])
+
+    strengths = ""
+    weaknesses = ""
+    if summary:
+        import re
+        strengths_match = re.search(r"(Strengths?:?)(.*?)(Weaknesses?:|$)", summary, re.IGNORECASE | re.DOTALL)
+        weaknesses_match = re.search(r"(Weaknesses?:?)(.*)", summary, re.IGNORECASE | re.DOTALL)
+        if strengths_match:
+            strengths = strengths_match.group(2).strip().strip(":").strip()
+        if weaknesses_match:
+            weaknesses = weaknesses_match.group(2).strip().strip(":").strip()
+        if not strengths and not weaknesses:
+            parts = summary.split("and", 1)
+            if len(parts) == 2:
+                strengths = parts[0].strip()
+                weaknesses = parts[1].strip()
+            else:
+                strengths = summary
+
+    slides = [
+        f"ATS Score: {ats_score}/100",
+        f"Strengths: {strengths or 'N/A'}",
+        f"Weaknesses: {weaknesses or 'N/A'}",
+        "Improvement Area: " + ("; ".join(suggestions) if suggestions else ("Add keywords - " + ", ".join(missing_terms) if missing_terms else "N/A"))
     ]
+    slide_duration = 3  # seconds
 
-    clips = []
-    for txt in texts:
-        clip = mpy.TextClip(txt, color='white', bg_color='#7f9cf5', size=(720, 480), method='caption', font='Arial', fontsize=48).set_duration(2)
-        clips.append(clip)
+    # --- State management for video simulation ---
+    if "video_playing" not in st.session_state:
+        st.session_state.video_playing = False
+    if "video_slide_idx" not in st.session_state:
+        st.session_state.video_slide_idx = 0
+    if "video_slide_start" not in st.session_state:
+        st.session_state.video_slide_start = 0
 
-    video = mpy.concatenate_videoclips(clips, method="compose")
+    # --- Video logic ---
+    if not st.session_state.video_playing:
+        # --- Center the Start button and match its size to Back button ---
+        btn_css = """
+            <style>
+            .min-btn-center button {
+                min-width: 120px !important;
+                min-height: 38px !important;
+                font-size: 1rem !important;
+                padding: 2px 10px !important;
+                border-radius: 7px !important;
+            }
+            </style>
+        """
+        st.markdown(btn_css, unsafe_allow_html=True)
+        start_col1, start_col2, start_col3 = st.columns([2,1,2])
+        with start_col2:
+            st.markdown('<div class="min-btn-center">', unsafe_allow_html=True)
+            if st.button("Start", key="video_summary_start", use_container_width=True):
+                st.session_state.video_playing = True
+                st.session_state.video_slide_idx = 0
+                st.session_state.video_slide_start = time.time()
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        back_col1, back_col2, back_col3 = st.columns([2,1,2])
+        with back_col2:
+            if st.button("Back", key="video_summary_back_btn", use_container_width=True):
+                st.session_state.page = "dashboard"
+                st.session_state.video_playing = False
+                st.session_state.video_slide_idx = 0
+                st.rerun()
+        return
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmpfile:
-        video.write_videofile(tmpfile.name, fps=24, codec="libx264", audio=False, verbose=False, logger=None)
-        st.video(tmpfile.name)
+    # --- Simulated video: show one slide at a time, auto-advance every 3s ---
+    slide_idx = st.session_state.video_slide_idx
+    slide_start = st.session_state.video_slide_start
 
-    st.markdown("This is an auto-generated video summary of your interview journey.")
-    back_to_dashboard_button("video_summary", target_page="dashboard")
+    # Only show the current slide
+    st.markdown(
+        f"""
+        <div style='
+            background: #111;
+            color: #fff;
+            border-radius: 18px;
+            padding: 2.2rem 1.2rem;
+            text-align: center;
+            min-height: 100px;
+            margin: 2em 0 1em 0;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: opacity 0.7s;
+            animation: fadein 0.7s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        '>
+            <span style="display:inline-block; max-width:90vw; word-break:break-word;">{slides[slide_idx]}</span>
+        </div>
+        <style>
+        @keyframes fadein {{
+            from {{ opacity: 0; }}
+            to {{ opacity: 1; }}
+        }}
+        </style>
+        """, unsafe_allow_html=True
+    )
+
+    # Show a "video" progress bar below the video area
+    st.markdown(
+        f"""
+        <div style='width:100%;margin:0 auto 1.5em auto;'>
+            <div style='background:#333;height:10px;border-radius:8px;overflow:hidden;'>
+                <div style='background:#7f9cf5;height:100%;width:{int((slide_idx+1)/len(slides)*100)}%;transition:width 0.5s;'></div>
+            </div>
+            <div style='text-align:center;font-size:0.95rem;color:#888;margin-top:0.2em;'>
+                {slide_idx+1} / {len(slides)} &nbsp; <span style="color:#fff;">Video Playing...</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True
+    )
+
+    # Advance slide automatically every 3 seconds
+    # Use Streamlit's built-in st.experimental_rerun() with a timer in session state
+    if time.time() - slide_start > slide_duration:
+        if slide_idx < len(slides) - 1:
+            st.session_state.video_slide_idx += 1
+            st.session_state.video_slide_start = time.time()
+            st.rerun()
+        else:
+            st.session_state.video_playing = False
+            st.session_state.video_slide_idx = 0
+            st.success("End of summary.")
+            back_col1, back_col2, back_col3 = st.columns([2,1,2])
+            with back_col2:
+                if st.button("Back to Dashboard", key="video_summary_end_back"):
+                    st.session_state.page = "dashboard"
+                    st.rerun()
+    else:
+        # Use st.empty() and time.sleep to force rerun and show next slide
+        import time as t
+        placeholder = st.empty()
+        t.sleep(0.1)  # Short sleep to allow UI to render
+        st.rerun()
+        # Show back button
+        back_col1, back_col2, back_col3 = st.columns([2,1,2])
+        with back_col2:
+            if st.button("Back", key="video_summary_back_btn", use_container_width=True):
+                st.session_state.page = "dashboard"
+                st.session_state.video_playing = False
+                st.session_state.video_slide_idx = 0
+                st.rerun()
 
 def ai_teacher_page():
     st.markdown("<h2 style='text-align:center;'>👨‍🏫 AI Teacher</h2>", unsafe_allow_html=True)
@@ -651,7 +982,7 @@ def ai_teacher_page():
     """
     st.markdown(btn_css, unsafe_allow_html=True)
 
-    btn_col1, btn_col2, btn_col3 = st.columns([2,1,2])
+    btn_col1, btn_col2, btn_col3 = st.columns([3,1,3])
     with btn_col2:
         get_exp_clicked = st.button("Explain", key="ai_teacher_btn", use_container_width=True, help="Get AI explanation", type="primary")
     next_clicked = False
@@ -692,8 +1023,8 @@ def ai_teacher_page():
     # Next button clears the explanation and question for a new input
     if next_clicked:
         st.session_state["ai_teacher_explanation"] = ""
-        # Do NOT set st.session_state["ai_teacher_q"] here, just rerun to clear explanation
-        st.experimental_rerun()
+        # Use st.rerun() instead of st.rerun()
+        st.rerun()
 
     if st.session_state.get("ai_teacher_explanation"):
         st.success("AI Explanation:")
@@ -722,6 +1053,11 @@ def ai_teacher_page():
                         st.warning("Could not generate audio. Check Murf API key and voice settings.")
                 else:
                     st.warning("Murf API is not available. Please check your Murf API key in the sidebar.")
+
+    # --- Add back button at the bottom ---
+    back_col1, back_col2, back_col3 = st.columns([2,1,2])
+    with back_col2:
+        back_to_dashboard_button("ai_teacher", target_page="dashboard")
 
 # --- Resume Analyzer Page ---
 def resume_analyzer_page():
@@ -849,7 +1185,7 @@ Resume Text:
         if st.session_state.get("ats_json"):
             audio_col1, audio_col2, audio_col3 = st.columns([3,2,3])
             with audio_col2:
-                play_audio = st.button("🔊 Listen to ATS Feedback", key="resume_audio_btn", use_container_width=True)
+                play_audio = st.button("🔊 ", key="resume_audio_btn", use_container_width=True)
             if play_audio:
                 ats_json = st.session_state["ats_json"]
                 summary_text = ats_json.get("summary", "")
@@ -871,6 +1207,7 @@ Resume Text:
                         st.warning("Could not generate audio. Check Murf API key and voice settings.")
                 else:
                     st.warning("Murf API is not available. Please check your Murf API key in the sidebar.")
+        # --- Center the Back button below everything ---
         # --- Center the Back button below everything ---
         back_col1, back_col2, back_col3 = st.columns([3,2,3])
         with back_col2:
@@ -926,8 +1263,12 @@ def interview_page():
         # Voice settings (just enable/disable, not select voice here)
         enable_voice = st.checkbox("Enable voice interaction", value=st.session_state.get("voice_enabled", True))
         st.session_state.voice_enabled = enable_voice
-        
-        if st.button("Start Interview", use_container_width=True):
+
+        # --- Center the Start Interview button using columns [2,1,2] ---
+        btn_col1, btn_col2, btn_col3 = st.columns([2,1,2])
+        with btn_col2:
+            start_clicked = st.button("Start Interview", use_container_width=True)
+        if start_clicked:
             qa_pairs = fetch_gemini_questions(company, job, diff, count, qtype)
             if not qa_pairs:
                 st.error("Could not fetch questions. Please try again.")
@@ -949,6 +1290,10 @@ def interview_page():
             st.session_state.qtype = qtype
             st.session_state.voice_enabled = enable_voice
             st.rerun()
+        # --- Add a back button below the Start Interview button, centered [2,1,2] ---
+        back_col1, back_col2, back_col3 = st.columns([2,1,2])
+        with back_col2:
+            back_to_dashboard_button("interview_setup", target_page="dashboard")
     else:
         qn = st.session_state.current
         if qn < len(st.session_state.questions):
@@ -963,10 +1308,9 @@ def interview_page():
                 options = None
                 correct_option = None
             st.markdown(f"**Question {qn+1}:** {question_text}")
-            # Add Listen to Question button for MCQ immediately after the question text
             if st.session_state.qtype == "MCQ":
                 if st.session_state.get("voice_enabled") and get_murf_api():
-                    if st.button("🔊 Listen to Question", key=f"listen_mcq_{qn}"):
+                    if st.button("🔊 ", key=f"listen_mcq_{qn}"):
                         audio_bytes = murf_tts(
                             question_text,
                             st.session_state.selected_voice
@@ -986,7 +1330,7 @@ def interview_page():
                 # Do not show options for Theoretical or Practical
                 # Play question audio if voice is enabled
                 if st.session_state.get("voice_enabled") and get_murf_api():
-                    if st.button("🔊 Listen to Question"):
+                    if st.button("🔊"):
                         audio_bytes = murf_tts(
                             question_text,
                             st.session_state.selected_voice
@@ -1137,7 +1481,7 @@ def interview_page():
                     st.write(ans['feedback']['model_answer'])
                 # --- Add audio feedback button for all question types ---
                 if st.session_state.get("voice_enabled") and get_murf_api():
-                    if st.button(f"🔊 Listen to Feedback for Q{idx+1}", key=f"audio_feedback_{idx}"):
+                    if st.button(f"🔊 Q{idx+1}", key=f"audio_feedback_{idx}"):
                         feedback_text = f"Your score is {ans['feedback']['overall_score']} out of 10. "
                         if ans['feedback']['suggested_improvements']:
                             feedback_text += ' '.join(ans['feedback']['suggested_improvements'])
@@ -1151,7 +1495,7 @@ def interview_page():
                             st.audio(audio_bytes, format="audio/mp3")
             if st.session_state.qtype in ["Theoretical", "Practical"]:
                 st.info("Scores for Theoretical and Practical questions are based on answer quality (max 10 per question). Feedback and model answers are provided for improvement.")
-            if st.button("Start New Interview", use_container_width=True):
+            if st.button("New Interview", use_container_width=True):
                 st.session_state.interview_started = False
                 st.rerun()
             # Add back button after interview summary
@@ -1179,35 +1523,41 @@ def communication_page():
     if "hr_chat_active" not in st.session_state:
         st.session_state.hr_chat_active = False
 
-    # Start HR round button (if not active)
+    # --- Centered Start and Back buttons with equal size ---
     if not st.session_state.hr_chat_active:
-        start_col1, start_col2 = st.columns([2, 2])
-        with start_col2:
-            if st.button("Start HR Round", key="hr_start_btn", use_container_width=True):
-                st.session_state.hr_chat_active = True
-                st.session_state.hr_chat_history = []
-                st.session_state.hr_current_question = None
-                st.session_state.hr_waiting_for_answer = False
-                # Immediately fetch the first HR question
-                GEMINI_API_KEY = get_gemini_api_key()
-                if not GEMINI_API_KEY:
-                    st.error("Gemini API key not set. Please set it in the sidebar.")
-                    return
-                genai.configure(api_key=GEMINI_API_KEY)
-                model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                prompt = (
-                    "You are an HR interviewer for a top company. Ask the user a real-world behavioral or situational interview question. "
-                    "Do not answer, only ask a question."
-                )
-                try:
-                    response = model.generate_content(prompt)
-                    hr_question = response.text.strip()
-                except Exception as e:
-                    hr_question = f"[Error from Gemini API: {e}]"
-                st.session_state.hr_current_question = hr_question
-                st.session_state.hr_waiting_for_answer = True
-                st.rerun()
-        back_to_dashboard_button("communication_convo", target_page="dashboard")
+        btn_col1, btn_col2, btn_col3 = st.columns([2,2,2])
+        with btn_col2:
+            start_clicked = st.button("Start", key="hr_start_btn", use_container_width=True)
+            back_clicked = st.button("\U0001F519 Back", key="back_to_dashboard_communication_convo", use_container_width=True)
+        if start_clicked:
+            st.session_state.hr_chat_active = True
+            st.session_state.hr_chat_history = []
+            st.session_state.hr_current_question = None
+            st.session_state.hr_waiting_for_answer = False
+            # Immediately fetch the first HR question
+            GEMINI_API_KEY = get_gemini_api_key()
+            if not GEMINI_API_KEY:
+                st.error("Gemini API key not set. Please set it in the sidebar.")
+                return
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
+            prompt = (
+                "You are an HR interviewer for a top company. Ask the user a real-world behavioral or situational interview question. "
+                "Do not answer, only ask a question."
+            )
+            try:
+                response = model.generate_content(prompt)
+                hr_question = response.text.strip()
+            except Exception as e:
+                hr_question = f"[Error from Gemini API: {e}]"
+            except Exception as e:
+                hr_question = f"[Error from Gemini API: {e}]"
+            st.session_state.hr_current_question = hr_question
+            st.session_state.hr_waiting_for_answer = True
+            st.rerun()
+        if back_clicked:
+            st.session_state.page = "dashboard"
+            st.rerun()
         return
 
     # --- Main HR chat flow ---
@@ -1221,7 +1571,7 @@ def communication_page():
         # Show current question
         st.markdown(f"**HR:** {st.session_state.hr_current_question}")
         # Optionally, play question audio
-        if st.button("🔊 Listen to Question", key="hr_listen_q"):
+        if st.button("🔊 ", key="hr_listen_q"):
             audio_bytes = murf_tts(st.session_state.hr_current_question)
             if audio_bytes:
                 st.audio(audio_bytes, format="audio/mp3")
@@ -1229,27 +1579,19 @@ def communication_page():
         answer = st.text_area("Your Answer (type here)", key="hr_answer_text")
         audio_file = st.file_uploader("Or upload a .wav audio answer", type=["wav"], key="hr_audio_upload")
         transcript = ""
-        if audio_file is not None:
-            # Transcribe audio using OpenAI Whisper
-            try:
-                import openai
-                openai.api_key = os.getenv("OPENAI_API_KEY")
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                    tmp.write(audio_file.read())
-                    tmp_path = tmp.name
-                with open(tmp_path, "rb") as af:
-                    transcript_resp = openai.Audio.transcribe("whisper-1", af)
-                    transcript = transcript_resp["text"]
-                os.remove(tmp_path)
-                st.success(f"Transcribed: {transcript}")
-            except Exception as e:
-                st.error(f"Audio transcription failed: {e}")
-        user_final_answer = transcript if transcript else answer
-        # Submit answer
-        if st.button("Submit Answer", key="hr_submit_btn", use_container_width=True):
-            if not user_final_answer.strip():
-                st.warning("Please provide an answer (text or audio).")
-                st.stop()
+        # --- Add Submit button for HR answer ---
+        submit_col1, submit_col2, submit_col3 = st.columns([2,1,2])
+        with submit_col2:
+            submit_hr_answer = st.button("Submit", key="hr_submit_btn", use_container_width=True)
+        if submit_hr_answer:
+            user_final_answer = answer.strip()
+            if audio_file is not None and not user_final_answer:
+                # Transcribe audio using OpenAI Whisper
+                try:
+                    st.warning("Please provide an answer (text or audio).")
+                    st.stop()
+                except Exception as e:
+                    st.error(f"Error processing audio file: {e}")
             # Get feedback from Gemini
             GEMINI_API_KEY = get_gemini_api_key()
             if not GEMINI_API_KEY:
@@ -1275,17 +1617,7 @@ def communication_page():
                 "feedback": feedback
             })
             st.session_state.hr_waiting_for_answer = False
-            st.session_state.hr_last_feedback = feedback
             st.rerun()
-        # Stop button
-        stop_col1, stop_col2, stop_col3 = st.columns([2,2,2])
-        with stop_col2:
-            if st.button("Stop", key="hr_stop_btn", use_container_width=True):
-                st.session_state.hr_chat_active = False
-                st.session_state.hr_chat_history = []
-                st.session_state.hr_current_question = None
-                st.session_state.hr_waiting_for_answer = False
-                st.rerun()
         return
 
     # --- After feedback, show feedback and Next Question button ---
@@ -1332,10 +1664,11 @@ def communication_page():
     back_to_dashboard_button("communication_convo", target_page="dashboard")
 
 # --- Streamlit Main Page Router ---
-if "page" not in st.session_state:
-    st.session_state.page = "login"
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+if "page" not in st.session_state:
+    st.session_state.page = "login"
+
 # --- Ensure selected_voice is always initialized ---
 if "selected_voice" not in st.session_state:
     # Use get_voice_options with a fallback if Murf API is not available
@@ -1345,6 +1678,13 @@ if "selected_voice" not in st.session_state:
         murf = None
     voice_options = get_voice_options(murf)
     st.session_state.selected_voice = list(voice_options.values())[0] if voice_options else "en-US-terrell"
+
+# --- Main Page Routing Logic ---
+if not st.session_state.get("logged_in", False):
+    st.session_state.page = "login"
+
+
+
 if st.session_state.page == "login":
     login_page()
 elif st.session_state.page == "signup":
@@ -1364,6 +1704,6 @@ elif st.session_state.page == "voice_settings":
 elif st.session_state.page == "video_summary":
     video_summary_page()
 else:
-    # Fallback: If page is not recognized, redirect to dashboard
-    st.session_state.page = "dashboard"
+    # Fallback: If page is not recognized, redirect to login
+    st.session_state.page = "login"
     st.rerun()
