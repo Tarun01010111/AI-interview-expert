@@ -15,5 +15,4 @@ python-docx
 pytesseract
 pillow
 moviepy
-tempfile
 
