@@ -175,48 +175,27 @@ def get_history(username):
 
 # --- Feature-Specific Helpers ---
 def murf_tts(text, voice_id=None):
+    """
+    Convert text to speech using Murf API
+    """
     try:
+        # Validate voice_id
         valid_voices = ["en-US-terrell", "en-US-samantha"]
         if voice_id not in valid_voices:
             voice_id = "en-US-terrell"
+            
+        # Get Murf API instance
         murf = get_murf_api()
         if not murf:
+            st.warning("Murf API not available. Please check your API key.")
             return None
-        # --- Murf API text length fix ---
-        max_len = 3000
-        if len(text) > max_len:
-            # Try to cut at a sentence boundary if possible
-            truncated = text[:max_len]
-            last_dot = truncated.rfind('.')
-            if last_dot > 0 and last_dot > max_len - 200:
-                truncated = truncated[:last_dot+1]
-            text = truncated
-        audio_data = murf.text_to_speech(text, voice_id)
-        if audio_data:
-            # --- Fix: Always return bytes for st.audio ---
-            if isinstance(audio_data, bytes):
-                return audio_data
-            elif isinstance(audio_data, str):
-                if audio_data.startswith("http"):
-                    import requests
-                    audio_bytes = requests.get(audio_data).content
-                    return audio_bytes
-                elif os.path.exists(audio_data):
-                    with open(audio_data, "rb") as f:
-                        audio_bytes = f.read()
-                    return audio_bytes
-                else:
-                    # If it's a base64 string or other, decode if possible
-                    try:
-                        import base64
-                        audio_bytes = base64.b64decode(audio_data)
-                        return audio_bytes
-                    except Exception:
-                        return audio_data.encode("utf-8")
-            else:
-                return bytes(audio_data)
-        return None
+            
+        # Convert text to speech
+        audio_bytes = murf.text_to_speech(text, voice_id)
+        return audio_bytes
+        
     except Exception as e:
+        st.error(f"Error in TTS: {str(e)}")
         return None
 
 def get_voice_options(murf=None):
