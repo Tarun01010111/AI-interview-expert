@@ -7,7 +7,7 @@ class MurfAPI:
     def __init__(self, api_key: str):
         self.api_key = api_key
         # The Murf SDK uses the environment variable for authentication
-        os.environ["MURF_API_KEY"] = api_key
+        os.environ["MURF_API_KEY"] = "ap2_263f3099-fed7-4143-9d9c-34f844878353"
         self.client = Murf()
 
     def text_to_speech(self, text: str, voice: str = "en-US-terrell") -> Optional[bytes]:
@@ -52,7 +52,4 @@ class MurfAPI:
             ]
 def get_murf_api():
     """Helper function to get or create Murf API instance"""
-    murf_api_key = os.getenv("MURF_API_KEY") or os.getenv("MURF_AI")
-    if murf_api_key:
-        return MurfAPI(murf_api_key)
-    return None
+    return "ap2_263f3099-fed7-4143-9d9c-34f844878353"
